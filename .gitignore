@@ -1,0 +1,66 @@
+# --- Node.js ---
+apps/frontend/node_modules/
+node_modules/
+apps/frontend/dist/
+apps/frontend/.next/
+apps/frontend/.vite/
+apps/frontend/.turbo/
+apps/frontend/.eslintcache
+apps/frontend/yarn.lock
+apps/frontend/package-lock.json
+
+# --- Python ---
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+*.log
+*.sqlite3
+*.db
+.env
+.venv/
+venv/
+apps/backend/__pycache__/
+apps/backend/.env
+apps/backend/.pytest_cache/
+apps/backend/.mypy_cache/
+
+# --- Vite / React ---
+apps/frontend/build/
+apps/frontend/.DS_Store
+
+# --- OS / Editor specific ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# --- Static outputs ---
+*.bak
+*.tmp
+
+# --- Optional: lock files (if you regenerate often) ---
+# yarn.lock
+# package-lock.json
+
+# --- Jupyter/Notebook cache (if applicable) ---
+.ipynb_checkpoints/
+
+# --- Coverage / testing ---
+coverage/
+*.coverage
+*.lcov
+
+# --- Logs ---
+*.log
+
+# --- Custom folders you may want to ignore ---
+documents/
+scripts/__pycache__/
+config/
+
+# --- Compiled output (if using TypeScript) ---
+apps/frontend/**/*.tsbuildinfo
+*.png
+public/images/unclassified/deleted/*.json
