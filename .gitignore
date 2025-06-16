@@ -59,8 +59,8 @@ coverage/
 documents/
 scripts/__pycache__/
 config/
+public/images/unclassified/deleted/*.json
+*.png
 
 # --- Compiled output (if using TypeScript) ---
 apps/frontend/**/*.tsbuildinfo
-*.png
-public/images/unclassified/deleted/*.json
