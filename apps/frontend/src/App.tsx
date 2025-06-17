@@ -56,6 +56,7 @@ function App() {
   const [confirmDeleteAll, setConfirmDeleteAll] = useState<boolean>(false)
   const [confirmRestoreFilename, setConfirmRestoreFilename] = useState<string | null>(null)
   const [selectedImageFilename, setSelectedImageFilename] = useState<string | null>(null)
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(true)
 
   // バックエンドのベースURLを動的に設定
   const BASE_URL = `http://${window.location.hostname}:3000`
@@ -127,11 +128,17 @@ function App() {
         throw new Error('ステータス取得に失敗しました')
       }
       const data = await response.json()
-      setIsSetupRequired(!data.unclassified_path)
+      // モバイルデバイスの場合は、セットアップが必要かどうかのチェックをスキップ
+      if (!isMobile) {
+        setIsSetupRequired(!data.unclassified_path)
+      }
       setCurrentFolderPath(data.unclassified_path || '未設定')
     } catch (err) {
       console.error('セットアップステータス取得エラー:', err)
-      setIsSetupRequired(true)
+      // モバイルデバイスの場合は、エラー時もセットアップが必要としない
+      if (!isMobile) {
+        setIsSetupRequired(true)
+      }
       setCurrentFolderPath('エラー')
     }
   }
@@ -337,6 +344,12 @@ function App() {
             <div className="text-center py-8">
               <p className="text-lg mb-4">セットアップが必要です。続行するには「開始」をクリックしてください。</p>
               <Button onClick={() => setShowSetupWizard(true)}>開始</Button>
+            </div>
+          )}
+
+          {isMobile && !currentFolderPath && (
+            <div className="text-center py-8">
+              <p className="text-lg mb-4">PCでSikorityのセットアップを完了してください。</p>
             </div>
           )}
 
@@ -627,7 +640,12 @@ function App() {
             </TabsContent>
             {!isMobile && (
               <TabsContent value="generation">
-                <ImageGenerator onImageGenerated={() => fetchAllImages()} />
+                <ImageGenerator
+                  onImageGenerated={async () => {
+                    await fetchAllImages()
+                  }}
+                  isDarkMode={isDarkMode}
+                />
               </TabsContent>
             )}
           </Tabs>

@@ -64,7 +64,7 @@ app = FastAPI(title="Sikority API")
 # CORSの設定
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # フロントエンドのURLを指定
+    allow_origins=["*"],  # すべてのオリジンからのアクセスを許可
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -158,23 +158,29 @@ async def get_status():
 @app.post("/api/setup-unclassified-folder")
 async def setup_unclassified_folder(request: SetupFolderRequest):
     folder_path = request.folder_path
+    print(f"受信したフォルダパス: {folder_path}")  # デバッグログ
     try:
         new_unclassified_abs_path = Path(folder_path).resolve()
+        print(f"解決されたパス: {new_unclassified_abs_path}")  # デバッグログ
         
         if not new_unclassified_abs_path.is_dir():
+            print(f"パスが存在しないか、ディレクトリではありません: {new_unclassified_abs_path}")  # デバッグログ
             raise HTTPException(status_code=400, detail=f"指定されたパスはディレクトリではありません、または存在しません: {folder_path}")
         
         # 設定を更新して保存
         config["paths"]["unclassified"] = str(new_unclassified_abs_path)
         save_config()
+        print(f"設定を保存しました: {config['paths']['unclassified']}")  # デバッグログ
         
         # 分類済みフォルダが存在しない場合は作成
         for rating in ["S", "A", "B", "C", "D"]:
             classified_folder = get_classified_dir_path(rating)
             classified_folder.mkdir(parents=True, exist_ok=True)
+            print(f"分類フォルダを作成: {classified_folder}")  # デバッグログ
 
         return {"message": "未分類フォルダが設定されました。サーバーを再起動してください。"}
     except Exception as e:
+        print(f"セットアップエラー: {str(e)}")  # デバッグログ
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/images")
@@ -578,59 +584,75 @@ async def delete_all_deleted():
 
 def get_available_models() -> List[Model]:
     """利用可能なモデルの一覧を取得"""
-    # プロジェクトルートからの相対パスでモデルディレクトリを指定
-    models_dir = Path("C:/Users/toshi/AppData/Roaming/StabilityMatrix/Models/StableDiffusion")
-    print(f"プロジェクトルート: {project_root}")  # デバッグログ
-    print(f"モデルディレクトリのパス: {models_dir}")  # デバッグログ
-    print(f"モデルディレクトリの存在確認: {models_dir.exists()}")  # デバッグログ
-    
-    if not models_dir.exists():
-        print(f"モデルディレクトリが存在しません: {models_dir}")  # デバッグログ
-        return []
-    
-    # モデルID（ディレクトリ名）ごとに一意のモデルを保持するための辞書
-    unique_models: Dict[str, Model] = {}
+    try:
+        # 現在のファイルの場所からStabilityMatrixのルートディレクトリを取得
+        current_file = Path(__file__)
+        base_dir = current_file.parent.parent.parent.parent
+        models_dir = base_dir / "Models" / "StableDiffusion"
+        
+        print(f"現在のファイル: {current_file}")  # デバッグログ
+        print(f"ベースディレクトリ: {base_dir}")  # デバッグログ
+        print(f"モデルディレクトリのパス: {models_dir}")  # デバッグログ
+        print(f"モデルディレクトリの存在確認: {models_dir.exists()}")  # デバッグログ
+        
+        if not models_dir.exists():
+            print(f"モデルディレクトリが存在しません: {models_dir}")  # デバッグログ
+            # 代替パスを試す
+            alternative_path = Path("Models/StableDiffusion")
+            print(f"代替パスを試します: {alternative_path}")  # デバッグログ
+            if alternative_path.exists():
+                models_dir = alternative_path
+                print(f"代替パスを使用します: {models_dir}")  # デバッグログ
+            else:
+                print(f"代替パスも存在しません: {alternative_path}")  # デバッグログ
+                return []
+        
+        # モデルID（ディレクトリ名）ごとに一意のモデルを保持するための辞書
+        unique_models: Dict[str, Model] = {}
 
-    for model_dir in models_dir.iterdir():
-        print(f"検索中のディレクトリ: {model_dir}")  # デバッグログ
-        print(f"ディレクトリかどうか: {model_dir.is_dir()}")  # デバッグログ
+        for model_dir in models_dir.iterdir():
+            print(f"検索中のディレクトリ: {model_dir}")  # デバッグログ
+            print(f"ディレクトリかどうか: {model_dir.is_dir()}")  # デバッグログ
+            
+            if not model_dir.is_dir():
+                continue
+            
+            print(f"モデルディレクトリを検索中: {model_dir}")  # デバッグログ
+            
+            # モデルディレクトリ内のモデルファイルを探す（.safetensorsと.checkpoint）
+            model_files = []
+            model_files.extend(model_dir.glob("*.safetensors"))
+            model_files.extend(model_dir.glob("*.checkpoint"))
+            print(f"見つかったモデルファイル: {model_files}")  # デバッグログ
+            
+            if model_files:
+                # ファイルの更新日時でソートして最新のものを取得
+                latest_model = max(model_files, key=lambda x: x.stat().st_mtime)
+                print(f"最新のモデルファイル: {latest_model}")  # デバッグログ
+                
+                model_id = model_dir.name # 各ディレクトリ名をモデルIDとして使用
+                model_name = model_dir.name.capitalize()
+                model_path = str(latest_model.relative_to(models_dir))
+                
+                # ファイルの種類に応じて説明を追加
+                file_type = "Safetensors" if latest_model.suffix == ".safetensors" else "Checkpoint"
+                
+                # 辞書に追加（同じIDがあれば上書きされるため、重複が排除される）
+                unique_models[model_id] = Model(
+                    id=model_id,
+                    name=model_name,
+                    path=model_path,
+                    description=f"{model_name}モデル ({file_type})"
+                )
         
-        if not model_dir.is_dir():
-            continue
-            
-        print(f"モデルディレクトリを検索中: {model_dir}")  # デバッグログ
-        
-        # モデルディレクトリ内のモデルファイルを探す（.safetensorsと.checkpoint）
-        model_files = []
-        model_files.extend(model_dir.glob("*.safetensors"))
-        model_files.extend(model_dir.glob("*.checkpoint"))
-        print(f"見つかったモデルファイル: {model_files}")  # デバッグログ
-        
-        if model_files:
-            # ファイルの更新日時でソートして最新のものを取得
-            latest_model = max(model_files, key=lambda x: x.stat().st_mtime)
-            print(f"最新のモデルファイル: {latest_model}")  # デバッグログ
-            
-            model_id = model_dir.name # 各ディレクトリ名をモデルIDとして使用
-            model_name = model_dir.name.capitalize()
-            model_path = str(latest_model.relative_to(models_dir))
-            
-            # ファイルの種類に応じて説明を追加
-            file_type = "Safetensors" if latest_model.suffix == ".safetensors" else "Checkpoint"
-            
-            # 辞書に追加（同じIDがあれば上書きされるため、重複が排除される）
-            unique_models[model_id] = Model(
-                id=model_id,
-                name=model_name,
-                path=model_path,
-                description=f"{model_name}モデル ({file_type})"
-            )
-    
-    # 辞書の値（Modelオブジェクト）のリストを返す
-    result_models = list(unique_models.values())
-    print(f"見つかったモデル数 (重複排除後): {len(result_models)}")  # デバッグログ
-    print(f"見つかったモデル一覧 (重複排除後): {result_models}")  # デバッグログ
-    return result_models
+        # 辞書の値（Modelオブジェクト）のリストを返す
+        result_models = list(unique_models.values())
+        print(f"見つかったモデル数 (重複排除後): {len(result_models)}")  # デバッグログ
+        print(f"見つかったモデル一覧 (重複排除後): {result_models}")  # デバッグログ
+        return result_models
+    except Exception as e:
+        print(f"モデル取得エラー: {str(e)}")  # デバッグログ
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn

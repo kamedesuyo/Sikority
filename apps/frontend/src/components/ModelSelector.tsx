@@ -2,31 +2,38 @@ import React, { useState, useEffect } from 'react';
 import { Model } from '../types/model';
 
 interface ModelSelectorProps {
+  selectedModelId?: string | null;
   onModelSelect: (modelId: string) => void;
   isDarkMode: boolean;
 }
 
-const ModelSelector: React.FC<ModelSelectorProps> = ({ onModelSelect, isDarkMode }) => {
+const ModelSelector: React.FC<ModelSelectorProps> = ({ selectedModelId, onModelSelect, isDarkMode }) => {
   const [models, setModels] = useState<Model[]>([]);
   const [selectedModel, setSelectedModel] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // バックエンドのベースURLを動的に設定
+  const BASE_URL = `http://${window.location.hostname}:3000`;
+
   useEffect(() => {
     const fetchModels = async () => {
       try {
-        const response = await fetch('http://localhost:3000/api/models');
+        const response = await fetch(`${BASE_URL}/api/models`);
         if (!response.ok) {
-          throw new Error('モデルの取得に失敗しました');
+          throw new Error(`モデルの取得に失敗しました (${response.status})`);
         }
         const data = await response.json();
         console.log('取得したモデル一覧:', data);  // デバッグログ
         
         if (Array.isArray(data)) {
-          setModels(data);
-          if (data.length > 0) {
-            setSelectedModel(data[0].id);
-            onModelSelect(data[0].id);
+          if (data.length === 0) {
+            setError('利用可能なモデルが見つかりません。StabilityMatrixにモデルがインストールされているか確認してください。');
+          } else {
+            setModels(data);
+            const initialModel = selectedModelId || data[0].id;
+            setSelectedModel(initialModel);
+            onModelSelect(initialModel);
           }
         } else {
           throw new Error('モデルデータの形式が不正です');
@@ -34,13 +41,24 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ onModelSelect, isDarkMode
       } catch (err) {
         console.error('モデル取得エラー:', err);
         setError(err instanceof Error ? err.message : 'モデルの取得中にエラーが発生しました');
+        // 3秒後に再試行
+        setTimeout(() => {
+          fetchModels();
+        }, 3000);
       } finally {
         setLoading(false);
       }
     };
 
     fetchModels();
-  }, [onModelSelect]);
+  }, [onModelSelect, BASE_URL, selectedModelId]);
+
+  // 外部からselectedModelIdが変更された場合の処理
+  useEffect(() => {
+    if (selectedModelId && selectedModelId !== selectedModel) {
+      setSelectedModel(selectedModelId);
+    }
+  }, [selectedModelId, selectedModel]);
 
   const handleModelChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const modelId = event.target.value;
